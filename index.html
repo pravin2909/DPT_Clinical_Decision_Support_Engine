@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>DPT Clinical Decision Support Engine</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#161627",
+                        "background-light": "#f6f6f7",
+                        "background-dark": "#16161c",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+    <style>
+        .scanning-line {
+            position: absolute;
+            width: 100%;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 0 15px 2px rgba(255, 255, 255, 0.8);
+            top: 50%;
+            left: 0;
+            display: none;
+        }
+        .scanning .scanning-line {
+            display: block;
+            animation: scan 2s linear infinite;
+        }
+        @keyframes scan {
+            0% { top: 0%; }
+            50% { top: 100%; }
+            100% { top: 0%; }
+        }
+        .mesh-gradient {
+            background-color: #161627;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(22, 22, 39, 0.5) 0px, transparent 50%),
+                radial-gradient(at 50% 0%, rgba(50, 50, 80, 0.3) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(22, 22, 39, 0.5) 0px, transparent 50%);
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100">
+    <div class="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
+        <div class="layout-container flex h-full grow flex-col">
+            <!-- Top Navigation Bar -->
+            <header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-slate-200 dark:border-slate-800 px-6 py-3 bg-white dark:bg-primary">
+                <div class="flex items-center gap-4 text-primary dark:text-slate-100">
+                    <div class="size-8 flex items-center justify-center bg-primary text-white rounded">
+                        <span class="material-symbols-outlined text-xl">biotech</span>
+                    </div>
+                    <h2 class="text-primary dark:text-slate-100 text-lg font-bold leading-tight tracking-[-0.015em]">DPT Clinical Engine</h2>
+                </div>
+            </header>
+
+            <main class="flex-1 flex flex-col items-center px-4 py-8 md:px-20 lg:px-40 pb-20">
+                <div class="layout-content-container flex flex-col max-w-[960px] w-full gap-8">
+                    
+                    <!-- Tabs Navigation -->
+                    <div class="flex p-1 bg-slate-200 dark:bg-slate-800 rounded-lg max-w-fit mx-auto mb-2 shadow-sm">
+                        <button id="tabImage" onclick="switchTab('image')" class="px-6 py-2 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm font-semibold transition-all">Image Scan</button>
+                        <button id="tabText" onclick="switchTab('text')" class="px-6 py-2 rounded-md text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-semibold transition-all">Text Symptoms</button>
+                        <button id="tabVoice" onclick="switchTab('voice')" class="px-6 py-2 rounded-md text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-semibold flex items-center gap-2 transition-all"><span class="material-symbols-outlined text-sm">mic</span> Voice Input</button>
+                    </div>
+
+                    <!-- Image Analysis Hero Section -->
+                    <div class="relative overflow-hidden rounded-xl bg-primary shadow-2xl group cursor-pointer hover:shadow-[0_0_20px_#1e3a8a] transition-all tab-section" id="imagePreviewContainer">
+                        <input type="file" id="fileUpload" class="hidden" accept="image/*" />
+                        <div id="imagePreview" class="aspect-video w-full bg-cover bg-center opacity-100 transition-all" style="background-image: linear-gradient(to bottom, rgba(22, 22, 39, 0.7), rgba(22, 22, 39, 0.9)), url('https://lh3.googleusercontent.com/aida-public/AB6AXuAysRzNgh_ad7B08oAyrlrh4pLcIW2Y_Vqn5_2tQrmylKZDc6YgsqFXhViqKCAee0qcv1uZKBOSElyJQOU2XIf_UayJYfN6i4SxnwCaXhrva99tRItlMTGFDUbnJ6AXBAZXgSM1bpSAdNor3qgQ1tJ48peqjj0NzQliignf6zjkxci-x4mir3CRpSrSY40u67FSNQ69L3bci6F7Bu1biXnd4d8mlH7lIfLMZ5YRxBgcsQtgtOmjU9VzUWaZz5ORSLesGebsOnZ2IsTF');">
+                            <div class="absolute inset-0 bg-gradient-to-t from-primary via-transparent to-transparent"></div>
+                            <div class="scanning-line"></div>
+                            
+                            <!-- Upload Prompt Overlay -->
+                            <div id="uploadPrompt" class="absolute inset-0 flex flex-col items-center justify-center text-white/50 hover:text-white/80 transition-colors">
+                                <span class="material-symbols-outlined text-6xl mb-2">upload_file</span>
+                                <p class="text-lg font-semibold tracking-widest uppercase">Click to Upload Medical Scan</p>
+                            </div>
+                        </div>
+
+                        <div class="absolute bottom-0 left-0 p-6 w-full flex justify-between items-end">
+                            <div>
+                                <span id="liveBadge" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-600 text-white mb-2 transition-colors">
+                                    <span id="liveIndicator" class="size-2 bg-white rounded-full mr-2"></span>
+                                    <span id="liveText">SYSTEM READY</span>
+                                </span>
+                                <h1 id="statusText" class="text-white text-3xl font-bold">Awaiting Image Evidence</h1>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Text Analysis Section -->
+                    <div id="textSectionContainer" class="hidden tab-section bg-white dark:bg-primary/40 rounded-xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden transition-all">
+                        <h2 class="text-xl font-bold mb-4 flex items-center gap-2 text-slate-900 dark:text-white">
+                            <span class="material-symbols-outlined text-blue-500">description</span>
+                            Clinical Text Symptoms
+                        </h2>
+                        <textarea id="textSymptomsInput" rows="5" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4 focus:ring-2 focus:ring-blue-500 focus:outline-none resize-none text-slate-900 dark:text-white shadow-inner" placeholder="Describe the patient's symptoms here... (e.g., 'Patient presents with a red, itchy rash on the left arm that started 3 days ago')"></textarea>
+                        <div class="flex justify-end mt-4">
+                            <button id="analyzeTextBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold transition-all shadow-lg hover:shadow-blue-500/50 flex items-center gap-2 hover:-translate-y-0.5">
+                                <span class="material-symbols-outlined">analytics</span> Analyze Symptoms
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Voice Analysis Section -->
+                    <div id="voiceSectionContainer" class="hidden tab-section bg-white dark:bg-primary/40 rounded-xl p-8 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden flex flex-col items-center group transition-all">
+                        <h2 class="text-xl font-bold mb-8 flex items-center gap-2 text-slate-900 dark:text-white">
+                            <span class="material-symbols-outlined text-blue-500">mic</span>
+                            Voice Symptoms Recording
+                        </h2>
+                        
+                        <div class="relative flex justify-center items-center h-32 w-32 mb-4">
+                            <button id="recordBtn" class="absolute z-10 size-24 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition-all shadow-[0_0_20px_rgba(239,68,68,0.5)] cursor-pointer hover:scale-105 active:scale-95">
+                                <span id="recordIcon" class="material-symbols-outlined text-4xl">mic</span>
+                            </button>
+                            <div id="recordWaves" class="absolute inset-0 rounded-full border-2 border-red-500 animate-ping hidden"></div>
+                        </div>
+
+                        <p id="recordStatus" class="mt-2 text-slate-500 font-semibold tracking-wide text-center h-6">Click mic to start recording</p>
+                        
+                        <div class="w-full max-w-md mt-6">
+                            <audio id="audioPlayback" class="hidden w-full mb-4 shadow" controls></audio>
+                            <div class="gap-4 hidden w-full justify-center" id="voiceActionsContainer">
+                                <button id="analyzeAudioBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold transition-all shadow-lg hover:shadow-blue-500/50 flex items-center gap-2 hover:-translate-y-0.5">
+                                    <span class="material-symbols-outlined">analytics</span> Analyze Audio
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI Reasoning Pipeline Section -->
+                    <div class="bg-white dark:bg-primary/40 rounded-xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm">
+                        <h2 class="text-slate-900 dark:text-white text-xl font-bold mb-6 flex items-center gap-2">
+                            <span class="material-symbols-outlined text-blue-500">account_tree</span>
+                            AI Reasoning Pipeline
+                        </h2>
+                        
+                        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 relative">
+                            <!-- MobileNet V2 Routing -->
+                            <div class="flex-1 flex flex-col items-center text-center">
+                                <div id="routingIcon" class="size-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mb-2 transition-all">
+                                    <span class="material-symbols-outlined">route</span>
+                                </div>
+                                <p class="text-sm font-bold text-slate-900 dark:text-white">MobileNet V2 Router</p>
+                                <p id="routerText" class="text-xs text-slate-500 font-semibold h-4">Awaiting Signal...</p>
+                            </div>
+                            
+                            <div class="hidden md:block h-px flex-1 bg-slate-200 dark:bg-slate-700" id="routeLine1"></div>
+                            
+                            <!-- ViT Classification -->
+                            <div class="flex-1 flex flex-col items-center text-center">
+                                <div id="vitIcon" class="size-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mb-2 transition-all">
+                                    <span class="material-symbols-outlined">memory</span>
+                                </div>
+                                <p class="text-sm font-bold text-slate-900 dark:text-white">Vision Transformer</p>
+                                <p id="vitText" class="text-xs text-slate-500 font-semibold h-4">Feature Extraction</p>
+                            </div>
+                            
+                            <div class="hidden md:block h-px flex-1 bg-slate-200 dark:bg-slate-700" id="routeLine2"></div>
+                            
+                            <!-- Reasoning LLM -->
+                            <div class="flex-1 flex flex-col items-center text-center">
+                                <div id="llmIcon" class="size-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mb-2 transition-all">
+                                    <span class="material-symbols-outlined">psychology</span>
+                                </div>
+                                <p class="text-sm font-bold text-slate-900 dark:text-white">Reasoning LLM (Gemma)</p>
+                                <p id="llmText" class="text-xs text-slate-500 h-4">Clinical Output</p>
+                            </div>
+                        </div>
+
+                        <!-- Progress Bar Component -->
+                        <div class="mt-10 space-y-4">
+                            <div class="flex justify-between items-end">
+                                <div>
+                                    <p id="progressLabel" class="text-slate-900 dark:text-white font-semibold">Idle</p>
+                                    <p id="progressText" class="text-slate-500 text-sm">Please upload an image to begin pipeline.</p>
+                                </div>
+                                <span id="livePercent" class="text-blue-500 font-mono font-bold text-lg">0%</span>
+                            </div>
+                            <div class="h-3 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                <div id="progressBar" class="h-full bg-blue-500 rounded-full transition-all duration-500" style="width: 0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stats and Clinical Background Data -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="bg-white dark:bg-primary/40 rounded-xl p-4 border border-slate-200 dark:border-slate-800 flex flex-col gap-1">
+                            <p class="text-slate-500 text-xs uppercase font-bold tracking-wider">Confidence Score</p>
+                            <div class="flex items-baseline gap-2">
+                                <span id="confidenceScore" class="text-2xl font-bold text-slate-900 dark:text-white">---</span>
+                                <span id="confidenceLabel" class="text-slate-400 text-xs font-semibold flex items-center hidden">
+                                    <span class="material-symbols-outlined text-sm">trending_up</span> High
+                                </span>
+                            </div>
+                        </div>
+                        <div class="bg-white dark:bg-primary/40 rounded-xl p-4 border border-slate-200 dark:border-slate-800 flex flex-col gap-1">
+                            <p class="text-slate-500 text-xs uppercase font-bold tracking-wider">Inference Time</p>
+                            <div class="flex items-baseline gap-2">
+                                <span id="inferenceTime" class="text-2xl font-bold text-slate-900 dark:text-white">---</span>
+                                <span class="text-slate-400 text-xs font-mono">DPT Pipeline</span>
+                            </div>
+                        </div>
+                        <div class="bg-white dark:bg-primary/40 rounded-xl p-4 border border-slate-200 dark:border-slate-800 flex flex-col gap-1">
+                            <p class="text-slate-500 text-xs uppercase font-bold tracking-wider">Identified Domain</p>
+                            <div class="flex items-baseline gap-2">
+                                <span id="identifiedDomain" class="text-2xl font-bold text-slate-900 dark:text-white capitalize">---</span>
+                                <span class="text-slate-400 text-xs font-mono">Auto-Routing</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Clinical DPT Report Output Box -->
+                    <div id="reportSection" class="hidden animate-fade-in bg-white dark:bg-primary/40 rounded-xl border border-blue-500/50 shadow-lg shadow-blue-500/10 overflow-hidden">
+                        <div class="bg-blue-500/10 border-b border-blue-500/20 px-6 py-4 flex items-center gap-3">
+                            <span class="material-symbols-outlined text-blue-500">description</span>
+                            <h3 class="text-lg font-bold text-slate-900 dark:text-white">Diagnostic, Prognostic & Therapeutic Report</h3>
+                        </div>
+                        <div class="p-6">
+                            <div id="reportContent" class="prose prose-slate dark:prose-invert max-w-none font-medium leading-relaxed">
+                                <!-- Report generated by LLM goes here -->
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </main>
+
+            <!-- Footer / Status Bar -->
+            <footer class="border-t border-slate-200 dark:border-slate-800 px-6 py-3 flex justify-between items-center bg-white dark:bg-primary text-xs text-slate-500">
+                <div class="flex items-center gap-4">
+                    <span class="flex items-center gap-1">
+                        <span class="size-2 bg-green-500 rounded-full"></span>
+                        API: Online
+                    </span>
+                    <span class="flex items-center gap-1">
+                        <span class="material-symbols-outlined text-sm">database</span>
+                        v1.0.0
+                    </span>
+                </div>
+                <p>© 2026 DPT Clinical Decisions. AI Proof of Concept.</p>
+            </footer>
+            
+        </div>
+    </div>
+
+    <script>
+        const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+        const imagePreview = document.getElementById('imagePreview');
+        const fileUpload = document.getElementById('fileUpload');
+        const uploadPrompt = document.getElementById('uploadPrompt');
+        
+        const statusText = document.getElementById('statusText');
+        const liveBadge = document.getElementById('liveBadge');
+        const liveIndicator = document.getElementById('liveIndicator');
+        const liveText = document.getElementById('liveText');
+        const livePercent = document.getElementById('livePercent');
+        
+        const routingIcon = document.getElementById('routingIcon');
+        const routerText = document.getElementById('routerText');
+        const vitIcon = document.getElementById('vitIcon');
+        const vitText = document.getElementById('vitText');
+        const llmIcon = document.getElementById('llmIcon');
+        const llmText = document.getElementById('llmText');
+        
+        const routeLine1 = document.getElementById('routeLine1');
+        const routeLine2 = document.getElementById('routeLine2');
+        
+        const progressBar = document.getElementById('progressBar');
+        const progressLabel = document.getElementById('progressLabel');
+        const progressText = document.getElementById('progressText');
+        
+        const confidenceScore = document.getElementById('confidenceScore');
+        const confidenceLabel = document.getElementById('confidenceLabel');
+        const inferenceTime = document.getElementById('inferenceTime');
+        const identifiedDomain = document.getElementById('identifiedDomain');
+        
+        const reportSection = document.getElementById('reportSection');
+        const reportContent = document.getElementById('reportContent');
+
+        // Click to upload
+        imagePreviewContainer.addEventListener('click', () => fileUpload.click());
+
+        fileUpload.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if(!file) return;
+
+            // Reset UI for scanning
+            reportSection.classList.add('hidden');
+            reportContent.innerHTML = '';
+            
+            uploadPrompt.classList.add('hidden');
+            imagePreviewContainer.classList.add('scanning');
+            
+            // Set image preview
+            imagePreview.style.backgroundImage = `url(${URL.createObjectURL(file)})`;
+            
+            // Update UI State: Routing
+            liveBadge.className = "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500 text-white mb-2 transition-colors";
+            liveIndicator.classList.add('animate-pulse');
+            liveText.innerText = "LIVE SCAN";
+            statusText.innerText = "Analyzing Clinical Image...";
+            
+            routingIcon.className = "size-12 rounded-full bg-blue-500 text-white flex items-center justify-center mb-2 shadow-lg shadow-blue-500/30 transition-all";
+            routingIcon.innerHTML = `<span class="material-symbols-outlined animate-spin" style="animation-duration: 3s;">memory</span>`;
+            routerText.innerText = "Routing inference...";
+            
+            progressBar.style.width = '30%';
+            livePercent.innerText = "30%";
+            progressLabel.innerText = "MobileNet Fast Routing";
+            progressText.innerText = "Classifying image domain (skin, eye, dental)...";
+            
+            // Prepare request
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                // We'll use the normal API, but let's simulate the timeline visually
+                setTimeout(() => {
+                    // Update UI State: ViT
+                    routingIcon.className = "size-12 rounded-full bg-green-500/20 text-green-600 flex items-center justify-center mb-2 transition-all";
+                    routingIcon.innerHTML = `<span class="material-symbols-outlined">check_circle</span>`;
+                    
+                    routeLine1.className = "hidden md:block h-px flex-1 bg-gradient-to-r from-green-500 to-blue-500";
+                    
+                    vitIcon.className = "size-12 rounded-full bg-blue-500 text-white flex items-center justify-center mb-2 shadow-lg shadow-blue-500/30 transition-all";
+                    vitIcon.innerHTML = `<span class="material-symbols-outlined animate-spin" style="animation-duration: 3s;">memory</span>`;
+                    vitText.innerText = "Deep Feature Extraction...";
+                    
+                    progressBar.style.width = '60%';
+                    livePercent.innerText = "60%";
+                    progressLabel.innerText = "Vision Transformer Active";
+                    progressText.innerText = "Identifying specific pathology from visual features...";
+                }, 800);
+                
+                const res = await fetch('/analyze/image/stream', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!res.ok) {
+                    throw new Error("Server response error: " + res.statusText);
+                }
+                
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let done = false;
+                let reportContentStr = "";
+                const startTime = Date.now();
+                let buffer = "";
+                
+                while (!done) {
+                    const { value, done: doneReading } = await reader.read();
+                    done = doneReading;
+                    if (value) {
+                        buffer += decoder.decode(value, { stream: true });
+                        const lines = buffer.split('\n\n');
+                        buffer = lines.pop() || "";
+                        
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                const dataStr = line.substring(6);
+                                if (!dataStr) continue;
+                                
+                                try {
+                                    const data = JSON.parse(dataStr);
+                                    
+                                    if (data.type === 'classification') {
+                                        imagePreviewContainer.classList.remove('scanning');
+                                        
+                                        const domain = data.routing.domain;
+                                        const disease = data.classification.disease;
+                                        const conf = data.classification.confidence;
+                                        
+                                        statusText.innerText = disease.replace(/_/g, " ").toUpperCase();
+                                        
+                                        liveBadge.className = "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500 text-white mb-2 transition-colors";
+                                        liveIndicator.classList.remove('animate-pulse');
+                                        liveText.innerText = "ANALYSIS COMPLETE";
+                                        
+                                        routerText.innerText = domain.toUpperCase() + " Domain";
+                                        vitText.innerText = disease;
+                                        vitText.className = "text-xs text-blue-500 font-bold h-4";
+                                        
+                                        vitIcon.className = "size-12 rounded-full bg-green-500/20 text-green-600 flex items-center justify-center mb-2 transition-all";
+                                        vitIcon.innerHTML = `<span class="material-symbols-outlined">check_circle</span>`;
+                                        
+                                        routeLine2.className = "hidden md:block h-px flex-1 bg-gradient-to-r from-green-500 to-emerald-500";
+                                        
+                                        llmIcon.className = "size-12 rounded-full bg-emerald-500 text-white flex items-center justify-center mb-2 shadow-lg shadow-emerald-500/30 transition-all";
+                                        llmText.innerText = "Generating Report...";
+                                        llmText.className = "text-xs text-emerald-500 font-bold h-4";
+                                        
+                                        progressBar.style.width = '80%';
+                                        progressBar.className = "h-full bg-blue-500 rounded-full transition-all duration-500";
+                                        livePercent.innerText = "80%";
+                                        livePercent.className = "text-blue-500 font-mono font-bold text-lg";
+                                        
+                                        progressLabel.innerText = "LLM Synthesis...";
+                                        progressText.innerText = "Clinical report is being generated by Gemma.";
+                                        
+                                        confidenceScore.innerText = conf.toFixed(2) + "%";
+                                        confidenceLabel.classList.remove('hidden');
+                                        if (conf > 80) {
+                                            confidenceLabel.className = "text-green-500 text-xs font-semibold flex items-center";
+                                        } else if (conf > 50) {
+                                            confidenceLabel.className = "text-yellow-500 text-xs font-semibold flex items-center";
+                                            confidenceLabel.innerHTML = `<span class="material-symbols-outlined text-sm">warning</span> Moderate`;
+                                        } else {
+                                            confidenceLabel.className = "text-red-500 text-xs font-semibold flex items-center";
+                                            confidenceLabel.innerHTML = `<span class="material-symbols-outlined text-sm">error</span> Low`;
+                                        }
+                                        
+                                        identifiedDomain.innerText = domain;
+                                        
+                                        reportSection.classList.remove('hidden');
+                                        reportSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                    } else if (data.type === 'token') {
+                                        reportContentStr += data.content;
+                                        inferenceTime.innerText = ((Date.now() - startTime) / 1000).toFixed(2) + "s";
+                                        
+                                        let htmlReport = reportContentStr;
+                                        htmlReport = htmlReport.replace(/\*\*(.*?)\*\*/g, '<strong class="text-blue-400">$1</strong>');
+                                        htmlReport = htmlReport.split('\n\n').map(p => `<p class="mb-4">${p.replace(/\n/g, '<br>')}</p>`).join('');
+                                        reportContent.innerHTML = htmlReport;
+                                    } else if (data.type === 'done') {
+                                        llmText.innerText = "Report Generated";
+                                        
+                                        progressBar.style.width = '100%';
+                                        progressBar.className = "h-full bg-emerald-500 rounded-full transition-all duration-500";
+                                        livePercent.innerText = "100%";
+                                        livePercent.className = "text-emerald-500 font-mono font-bold text-lg";
+                                        
+                                        progressLabel.innerText = "LLM Synthesis Complete";
+                                        progressText.innerText = "Clinical report successfully generated by Gemma.";
+                                        inferenceTime.innerText = ((Date.now() - startTime) / 1000).toFixed(2) + "s";
+                                    }
+                                } catch (e) {
+                                    console.error("Error parsing stream data", e);
+                                }
+                            }
+                        }
+                    }
+                }
+                
+            } catch(err) {
+                console.error(err);
+                imagePreviewContainer.classList.remove('scanning');
+                statusText.innerText = "Analysis Interrupted";
+                progressLabel.innerText = "Error";
+                progressText.innerText = err.message || "Failed to process image through API.";
+                progressBar.style.width = '10%';
+                progressBar.classList.replace('bg-blue-500', 'bg-red-500');
+            }
+        });
+
+        // Tab Switching Logic
+        function switchTab(tabId) {
+            // Update buttons
+            ['tabImage', 'tabText', 'tabVoice'].forEach(id => {
+                const btn = document.getElementById(id);
+                if ((id === 'tabImage' && tabId === 'image') || 
+                    (id === 'tabText' && tabId === 'text') ||
+                    (id === 'tabVoice' && tabId === 'voice')) {
+                    btn.className = "px-6 py-2 rounded-md bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm font-semibold transition-all" + (id === 'tabVoice' ? " flex items-center gap-2" : "");
+                } else {
+                    btn.className = "px-6 py-2 rounded-md text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-semibold transition-all" + (id === 'tabVoice' ? " flex items-center gap-2" : "");
+                }
+            });
+
+            // Update sections
+            document.getElementById('imagePreviewContainer').classList.toggle('hidden', tabId !== 'image');
+            document.getElementById('textSectionContainer').classList.toggle('hidden', tabId !== 'text');
+            document.getElementById('voiceSectionContainer').classList.toggle('hidden', tabId !== 'voice');
+        }
+
+        // --- Text Analysis Logic ---
+        document.getElementById('analyzeTextBtn').addEventListener('click', async () => {
+             const text = document.getElementById('textSymptomsInput').value;
+             if (!text.trim()) { alert('Please enter symptoms first'); return; }
+
+             resetPipelineForAnalysis("Text Analysis", "text");
+             const formData = new URLSearchParams();
+             formData.append('symptoms', text);
+             try {
+                 const res = await fetch('/analyze/text/stream', { method: 'POST', body: formData, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+                 if (!res.ok) throw new Error("Server error: " + res.statusText);
+                 
+                 const reader = res.body.getReader();
+                 const decoder = new TextDecoder();
+                 let done = false;
+                 let buffer = "";
+                 let reportContentStr = "";
+                 const startTime = Date.now();
+                 
+                 while (!done) {
+                     const { value, done: doneReading } = await reader.read();
+                     done = doneReading;
+                     if (value) {
+                         buffer += decoder.decode(value, { stream: true });
+                         const lines = buffer.split('\\n\\n');
+                         buffer = lines.pop() || "";
+                         
+                         for (const line of lines) {
+                             if (line.startsWith('data: ')) {
+                                 const dataStr = line.substring(6);
+                                 if (!dataStr) continue;
+                                 try {
+                                     const data = JSON.parse(dataStr);
+                                     if (data.type === 'text_start') {
+                                         // Hide scanning, show streaming start
+                                         reportSection.classList.remove('hidden');
+                                         reportSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                         
+                                         progressBar.style.width = '80%';
+                                         livePercent.innerText = "80%";
+                                         progressLabel.innerText = "LLM Synthesis...";
+                                         progressText.innerText = "Clinical report is being generated by Gemma.";
+                                     } else if (data.type === 'token') {
+                                         reportContentStr += data.content;
+                                         inferenceTime.innerText = ((Date.now() - startTime) / 1000).toFixed(2) + "s";
+                                         
+                                         let htmlReport = reportContentStr;
+                                         htmlReport = htmlReport.replace(/\\*\\*(.*?)\\*\\*/g, '<strong class="text-blue-400">$1</strong>');
+                                         htmlReport = htmlReport.split('\\n\\n').map(p => `<p class="mb-4">${p.replace(/\\n/g, '<br>')}</p>`).join('');
+                                         reportContent.innerHTML = htmlReport;
+                                     } else if (data.type === 'done') {
+                                         finishPipelineAnalysis({ processing_time_seconds: ((Date.now() - startTime) / 1000).toFixed(2) });
+                                     }
+                                 } catch(e) { console.error("Error parsing stream data", e); }
+                             }
+                         }
+                     }
+                 }
+             } catch (err) { handleError(err); }
+        });
+
+        // --- Audio to WAV UI logic ---
+        async function convertAudioToWav(blob) {
+            return new Promise((resolve) => {
+                const fileReader = new FileReader();
+                fileReader.onloadend = async () => {
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const audioBuffer = await audioContext.decodeAudioData(fileReader.result);
+                    
+                    const numOfChan = audioBuffer.numberOfChannels;
+                    const length = audioBuffer.length * numOfChan * 2;
+                    const wavBuffer = new ArrayBuffer(44 + length);
+                    const view = new DataView(wavBuffer);
+                    
+                    const writeString = (view, offset, string) => {
+                        for (let i = 0; i < string.length; i++) view.setUint8(offset + i, string.charCodeAt(i));
+                    };
+                    
+                    writeString(view, 0, 'RIFF');
+                    view.setUint32(4, 36 + length, true);
+                    writeString(view, 8, 'WAVE');
+                    writeString(view, 12, 'fmt ');
+                    view.setUint32(16, 16, true);
+                    view.setUint16(20, 1, true);
+                    view.setUint16(22, numOfChan, true);
+                    view.setUint32(24, audioBuffer.sampleRate, true);
+                    view.setUint32(28, audioBuffer.sampleRate * numOfChan * 2, true);
+                    view.setUint16(32, numOfChan * 2, true);
+                    view.setUint16(34, 16, true);
+                    writeString(view, 36, 'data');
+                    view.setUint32(40, length, true);
+                    
+                    let pos = 0;
+                    let offset = 44;
+                    const channels = [];
+                    for (let i = 0; i < numOfChan; i++) channels.push(audioBuffer.getChannelData(i));
+                    
+                    while (pos < audioBuffer.length) {
+                        for (let i = 0; i < numOfChan; i++) {
+                            let sample = Math.max(-1, Math.min(1, channels[i][pos]));
+                            sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
+                            view.setInt16(offset, sample, true);
+                            offset += 2;
+                        }
+                        pos++;
+                    }
+                    resolve(new Blob([view], { type: 'audio/wav' }));
+                };
+                fileReader.readAsArrayBuffer(blob);
+            });
+        }
+
+        // --- Audio Analysis Logic ---
+        let mediaRecorder;
+        let audioChunks = [];
+        let audioBlob;
+        const recordBtn = document.getElementById('recordBtn');
+        const recordIcon = document.getElementById('recordIcon');
+        const recordWaves = document.getElementById('recordWaves');
+        const recordStatus = document.getElementById('recordStatus');
+        const audioPlayback = document.getElementById('audioPlayback');
+        const voiceActionsContainer = document.getElementById('voiceActionsContainer');
+        const analyzeAudioBtn = document.getElementById('analyzeAudioBtn');
+
+        recordBtn.addEventListener('click', async () => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                recordWaves.classList.add('hidden');
+                recordIcon.innerText = 'mic';
+                recordBtn.classList.remove('bg-slate-800');
+                recordBtn.classList.add('bg-red-500');
+                recordStatus.innerText = 'Processing audio format...';
+            } else {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+                    mediaRecorder.onstop = async () => {
+                        // Browser records in webm/ogg. We must encode to WAV for Python's speech_recognition.
+                        const webmBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        audioBlob = await exportToWav(webmBlob);
+                        
+                        const audioUrl = URL.createObjectURL(audioBlob);
+                        audioPlayback.src = audioUrl;
+                        audioPlayback.classList.remove('hidden');
+                        voiceActionsContainer.classList.remove('hidden');
+                        voiceActionsContainer.classList.add('flex');
+                        recordStatus.innerText = 'Recording saved as WAV. You can play back or analyze.';
+                    };
+                    mediaRecorder.start();
+                    recordWaves.classList.remove('hidden');
+                    recordIcon.innerText = 'stop';
+                    recordBtn.classList.remove('bg-red-500');
+                    recordBtn.classList.add('bg-slate-800');
+                    recordStatus.innerText = 'Recording in progress...';
+                    audioPlayback.classList.add('hidden');
+                    voiceActionsContainer.classList.add('hidden');
+                    voiceActionsContainer.classList.remove('flex');
+                } catch (err) {
+                    alert('Microphone access denied or not available.');
+                }
+            }
+        });
+
+        // Convert Blob to WAV for Python SpeechRecognition compatibility
+        async function exportToWav(blob) {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+            const arrayBuffer = await blob.arrayBuffer();
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            return bufferToWave(audioBuffer, audioBuffer.length);
+        }
+
+        function bufferToWave(abuffer, len) {
+            let numOfChan = abuffer.numberOfChannels,
+                length = len * numOfChan * 2 + 44,
+                buffer = new ArrayBuffer(length),
+                view = new DataView(buffer),
+                channels = [], i, sample, offset = 0, pos = 0;
+            
+            function setUint16(data) { view.setUint16(pos, data, true); pos += 2; }
+            function setUint32(data) { view.setUint32(pos, data, true); pos += 4; }
+
+            setUint32(0x46464952); // "RIFF"
+            setUint32(length - 8); // file length - 8
+            setUint32(0x45564157); // "WAVE"
+            setUint32(0x20746d66); // "fmt " chunk
+            setUint32(16); // length = 16
+            setUint16(1); // PCM (uncompressed)
+            setUint16(numOfChan);
+            setUint32(abuffer.sampleRate);
+            setUint32(abuffer.sampleRate * 2 * numOfChan); // avg. bytes/sec
+            setUint16(numOfChan * 2); // block-align
+            setUint16(16); // 16-bit
+
+            setUint32(0x61746164); // "data" - chunk
+            setUint32(length - pos - 4); // chunk length
+
+            for (i = 0; i < abuffer.numberOfChannels; i++) channels.push(abuffer.getChannelData(i));
+
+            while (pos < length) {
+                for (i = 0; i < numOfChan; i++) {
+                    sample = Math.max(-1, Math.min(1, channels[i][offset])); // clamp
+                    sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0; // scale
+                    view.setInt16(pos, sample, true); // write 16-bit
+                    pos += 2;
+                }
+                offset++;
+            }
+            return new Blob([buffer], {type: "audio/wav"});
+        }
+
+        analyzeAudioBtn.addEventListener('click', async () => {
+             if (!audioBlob) return;
+             resetPipelineForAnalysis("Audio Analysis", "audio");
+             const formData = new FormData();
+             formData.append('file', audioBlob, "recording.wav");
+             try {
+                 const res = await fetch('/analyze/audio/stream', { method: 'POST', body: formData });
+                 if (!res.ok) throw new Error("Server error: " + res.statusText);
+                 
+                 const reader = res.body.getReader();
+                 const decoder = new TextDecoder();
+                 let done = false;
+                 let buffer = "";
+                 let reportContentStr = "";
+                 let transcriptionText = "";
+                 const startTime = Date.now();
+                 
+                 while (!done) {
+                     const { value, done: doneReading } = await reader.read();
+                     done = doneReading;
+                     if (value) {
+                         buffer += decoder.decode(value, { stream: true });
+                         const lines = buffer.split('\\n\\n');
+                         buffer = lines.pop() || "";
+                         
+                         for (const line of lines) {
+                             if (line.startsWith('data: ')) {
+                                 const dataStr = line.substring(6);
+                                 if (!dataStr) continue;
+                                 try {
+                                     const data = JSON.parse(dataStr);
+                                     if (data.type === 'error') {
+                                         throw new Error(data.message);
+                                     } else if (data.type === 'audio_start') {
+                                         transcriptionText = data.transcription;
+                                         reportSection.classList.remove('hidden');
+                                         reportSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                         
+                                         progressBar.style.width = '80%';
+                                         livePercent.innerText = "80%";
+                                         progressLabel.innerText = "LLM Synthesis...";
+                                         progressText.innerText = "Clinical report is being generated by Gemma.";
+                                     } else if (data.type === 'token') {
+                                         reportContentStr += data.content;
+                                         inferenceTime.innerText = ((Date.now() - startTime) / 1000).toFixed(2) + "s";
+                                         
+                                         let contentHTML = `<div class="mb-4 p-4 bg-slate-100 dark:bg-slate-800 rounded-lg text-sm italic border-l-4 border-blue-500"><strong class="not-italic text-blue-500 mb-1 block">Audio Transcription:</strong> ${transcriptionText}</div>`;
+                                         let htmlReport = reportContentStr;
+                                         htmlReport = htmlReport.replace(/\\*\\*(.*?)\\*\\*/g, '<strong class="text-blue-400">$1</strong>');
+                                         htmlReport = htmlReport.split('\\n\\n').map(p => `<p class="mb-4">${p.replace(/\\n/g, '<br>')}</p>`).join('');
+                                         reportContent.innerHTML = contentHTML + htmlReport;
+                                     } else if (data.type === 'done') {
+                                         finishPipelineAnalysis({ processing_time_seconds: ((Date.now() - startTime) / 1000).toFixed(2) }, transcriptionText);
+                                     }
+                                 } catch(e) { 
+                                     if (e.message && dataStr.includes('"error"')) handleError(e);
+                                     else console.error("Error parsing stream data", e); 
+                                 }
+                             }
+                         }
+                     }
+                 }
+             } catch (err) { handleError(err); }
+        });
+
+        function resetPipelineForAnalysis(title, type) {
+            reportSection.classList.add('hidden');
+            reportContent.innerHTML = '';
+            
+            routerText.innerText = "Skipped (Direct to LLM)";
+            vitText.innerText = "Skipped (Text/Audio)";
+            llmText.innerText = "Generating Report...";
+            llmIcon.innerHTML = `<span class="material-symbols-outlined animate-spin" style="animation-duration: 3s;">memory</span>`;
+            
+            progressBar.style.width = '50%';
+            livePercent.innerText = "50%";
+            progressLabel.innerText = "Analyzing " + type.charAt(0).toUpperCase() + type.slice(1);
+            progressText.innerText = "Reasoning engine is processing. This takes ~15-30s. Please wait...";
+            progressBar.classList.add('animate-pulse');
+        }
+
+        function finishPipelineAnalysis(data, transcriptionText = null) {
+            progressBar.classList.remove('animate-pulse');
+            
+            if (data.error) {
+                handleError(new Error(data.error));
+                return;
+            }
+
+            routerText.innerText = "Bypassed";
+            vitText.innerText = "Bypassed";
+            llmText.innerText = "Report Generated";
+            llmIcon.className = "size-12 rounded-full bg-emerald-500 text-white flex items-center justify-center mb-2 shadow-lg shadow-emerald-500/30 transition-all";
+            llmIcon.innerHTML = `<span class="material-symbols-outlined">check_circle</span>`;
+            
+            progressBar.style.width = '100%';
+            progressBar.className = "h-full bg-emerald-500 rounded-full transition-all duration-500";
+            livePercent.innerText = "100%";
+            livePercent.className = "text-emerald-500 font-mono font-bold text-lg";
+            
+            progressLabel.innerText = "Analysis Complete";
+            let pTime = data.processing_time_seconds || 0;
+            progressText.innerText = "Report generated in " + pTime + "s.";
+            
+            confidenceScore.innerText = "N/A";
+            confidenceLabel.classList.add('hidden');
+            inferenceTime.innerText = pTime + "s";
+            identifiedDomain.innerText = "Symptom Processing";
+
+            reportSection.classList.remove('hidden');
+            let contentHTML = "";
+            if (transcriptionText) {
+                 contentHTML += `<div class="mb-4 p-4 bg-slate-100 dark:bg-slate-800 rounded-lg text-sm italic border-l-4 border-blue-500"><strong class="not-italic text-blue-500 mb-1 block">Audio Transcription:</strong> ${transcriptionText}</div>`;
+            }
+            let rawReport = data.report || "No report generated.";
+            rawReport = rawReport.replace(/\*\*(.*?)\*\*/g, '<strong class="text-blue-400">$1</strong>');
+            rawReport = rawReport.split('\n\n').map(p => `<p class="mb-4">${p.replace(/\n/g, '<br>')}</p>`).join('');
+            reportContent.innerHTML = contentHTML + rawReport;
+            reportSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function handleError(err) {
+            console.error(err);
+            progressLabel.innerText = "Error";
+            progressText.innerText = err.message || "Failed to process.";
+            progressBar.style.width = '10%';
+            progressBar.classList.replace('bg-blue-500', 'bg-red-500');
+        }
+    </script>
+</body>
+</html>
