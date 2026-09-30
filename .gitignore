@@ -1,0 +1,20 @@
+# Environment
+.env
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# OS
+.DS_Store
+
+# Model weights — too large for GitHub (>100MB). Distributed separately.
+*.pth
+Models/*.pth
+
+# Runtime
+uploads/*
+!uploads/.gitkeep

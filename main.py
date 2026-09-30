@@ -20,8 +20,8 @@ import time
 import os
 
 from app.pipeline import pipeline
-from app.reasoning import check_ollama_status
-from app.config import OLLAMA_MODEL
+from app.reasoning import check_llm_status
+from app.config import LLM_MODEL, LLM_BASE_URL
 
 
 # ──────────────────────────────────────
@@ -77,12 +77,13 @@ async def serve_ui():
 @app.get("/health")
 async def health_check():
     """System health check."""
-    ollama_ok = await check_ollama_status()
+    llm_ok = await check_llm_status()
     return {
-        "status": "healthy" if pipeline.is_loaded() and ollama_ok else "degraded",
+        "status": "healthy" if pipeline.is_loaded() and llm_ok else "degraded",
         "models_loaded": pipeline.is_loaded(),
-        "ollama_available": ollama_ok,
-        "ollama_model": OLLAMA_MODEL,
+        "llm_available": llm_ok,
+        "llm_model": LLM_MODEL,
+        "llm_base_url": LLM_BASE_URL,
         "device": str(pipeline.device),
     }
 

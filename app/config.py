@@ -5,6 +5,13 @@ All paths, model configs, and constants in one place.
 
 import os
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # dotenv is optional; env vars can still be set by the shell.
+    pass
+
 # ──────────────────────────────────────
 # Paths
 # ──────────────────────────────────────
@@ -90,10 +97,17 @@ NORMALIZE_MEAN = [0.485, 0.456, 0.406]
 NORMALIZE_STD = [0.229, 0.224, 0.225]
 
 # ──────────────────────────────────────
-# Ollama / Gemma 3 Config
+# LLM Reasoning Backend (OpenAI-compatible: LM Studio, Ollama, vLLM, etc.)
 # ──────────────────────────────────────
-OLLAMA_BASE_URL = "http://localhost:11434"
-OLLAMA_MODEL = "gemma3:4b"
+# LM Studio serves an OpenAI-compatible API at http://localhost:1234/v1
+# Ollama also exposes one at http://localhost:11434/v1
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://localhost:1234/v1")
+LLM_MODEL = os.getenv("LLM_MODEL", "google/gemma-4-e4b")
+# LM Studio ignores the key but the OpenAI-style API requires one to be present.
+LLM_API_KEY = os.getenv("LLM_API_KEY", "lm-studio")
+
+# Backwards-compatible alias (older code referenced OLLAMA_MODEL).
+OLLAMA_MODEL = LLM_MODEL
 
 # ──────────────────────────────────────
 # DPT Report System Prompt

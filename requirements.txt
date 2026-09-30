@@ -5,5 +5,10 @@ torchvision>=0.15.0
 httpx==0.27.0
 Pillow>=10.0.0
 SpeechRecognition>=3.10.0
-PyAudio>=0.2.14
 python-multipart>=0.0.9
+python-dotenv>=1.0.0
+
+# PyAudio is only needed for live microphone capture (not file transcription).
+# It requires the portaudio system library (macOS: `brew install portaudio`).
+# Uncomment if you need microphone input:
+# PyAudio>=0.2.14

@@ -2,8 +2,6 @@
 
 ## Diagnostic, Prognostic & Therapeutic (DPT)
 
-> **Note:** Trained model weights (.pth files) are not included in this repository due to file size constraints. You need to train them yourself using the provided training scripts (`vit_eye_disease.py`, `vit_dental_disease.py`, `vit_skin_disease.py`, `mobilenet_router.py`) on the Kaggle datasets listed below, and place the resulting `.pth` files in a `Models/` directory.
-
 ---
 
 ## 1. Project Overview
@@ -40,7 +38,7 @@ flowchart TD
     end
 
     subgraph REASONING["🧠 Reasoning Engine"]
-        OLLAMA["Gemma 3 via Ollama<br/>Reasoning LLM"]
+        OLLAMA["Qwen 3 via Ollama<br/>Reasoning LLM"]
     end
 
     subgraph OUTPUT["📄 Output"]
@@ -57,7 +55,7 @@ flowchart TD
     VIT_SKIN -->|"Disease Name"| OLLAMA
 
     TXT -->|"Symptom Text"| OLLAMA
-    AUD --> STT -->|"Converted Text"| OLLAMA
+    AUD --> STT --> |"Converted Text"| OLLAMA
 
     OLLAMA --> REPORT
 
@@ -83,7 +81,7 @@ The user speaks their symptoms aloud. The audio is converted to text via **Speec
 
 ---
 
-## 4. Pipeline Components
+## 4. Pipeline Components — Detailed Breakdown
 
 ### 4.1 MobileNet V2 — Image Router (Gateway Model)
 
@@ -105,6 +103,10 @@ The user speaks their symptoms aloud. The audio is converted to text via **Speec
 | Dental | `salmansajid05/oral-diseases` | Up to 4,000 |
 | Skin | `ismailpromus/skin-diseases-image-dataset` | Up to 4,000 |
 
+Once the router predicts the domain, the image is forwarded to the corresponding **domain-specific Vision Transformer (ViT)**.
+
+---
+
 ### 4.2 Vision Transformers — Disease Classifiers
 
 All three ViTs share the same custom architecture featuring:
@@ -119,6 +121,7 @@ All three ViTs share the same custom architecture featuring:
 | **Dataset** | Eye Diseases Classification (Kaggle) |
 | **Classes (4)** | Normal, Cataract, Diabetic Retinopathy, Glaucoma |
 | **Input** | 72×72 RGB retinal scan |
+| **Output** | Disease class + confidence |
 
 #### 🦷 Dental Disease ViT
 
@@ -127,6 +130,7 @@ All three ViTs share the same custom architecture featuring:
 | **Dataset** | Oral Diseases (Kaggle) |
 | **Classes (6)** | Calculus, Caries, Gingivitis, Hypodontia, Tooth Discoloration, Ulcers |
 | **Input** | 72×72 RGB dental image |
+| **Output** | Disease class + confidence |
 
 #### 🔬 Skin Disease ViT
 
@@ -136,19 +140,32 @@ All three ViTs share the same custom architecture featuring:
 | **Classes (10)** | Eczema, Melanoma, Atopic Dermatitis, Basal Cell Carcinoma, Melanocytic Nevi, Benign Keratosis, Psoriasis/Lichen Planus, Seborrheic Keratoses, Tinea/Ringworm, Warts/Molluscum |
 | **Input** | 72×72 RGB skin image |
 | **Accuracy** | **67.55%** validation accuracy |
+| **Output** | Disease class + confidence |
+
+---
 
 ### 4.3 Speech-to-Text Module
 
 Converts spoken symptom descriptions into text. The converted text is then passed directly to the reasoning LLM, following the same pathway as typed text input.
 
-### 4.4 Reasoning LLM — Gemma 3 (via Ollama)
+---
+
+### 4.4 Reasoning LLM — Qwen 3 (via Ollama)
 
 | Property | Detail |
 |---|---|
-| **Model** | Gemma 3 4B (downloaded via Ollama) |
+| **Model** | Qwen 3 (downloaded via Ollama) |
 | **Purpose** | Generate detailed clinical DPT report |
 | **Input** | Either: detected disease name (from image pipeline) OR symptom text (from text/audio pipeline) |
 | **Output** | Structured DPT clinical report |
+
+The reasoning LLM receives one of two types of input:
+1. **From image pipeline**: The classified disease name (e.g., *"Melanoma"*, *"Glaucoma"*, *"Caries"*)
+2. **From text/audio pipeline**: Raw symptom description text
+
+It then generates a comprehensive report using its medical knowledge.
+
+---
 
 ### 4.5 FastAPI Backend
 
@@ -156,11 +173,93 @@ The entire pipeline is orchestrated via a **FastAPI** server that:
 - Accepts image uploads, text input, and audio files via REST API endpoints
 - Routes inputs through the correct pipeline
 - Returns the final DPT report as a structured JSON response
-- Supports SSE streaming for real-time token-by-token report generation
+- Serves as the backend for the Google Stitch UI frontend
 
 ---
 
-## 5. Model Summary
+## 5. Complete Pipeline Flow
+
+### Flow A: Image Input
+
+```
+User uploads image
+    │
+    ▼
+FastAPI receives image
+    │
+    ▼
+MobileNet V2 classifies → "skin" (99.92% accurate)
+    │
+    ▼
+Image routed to Skin ViT
+    │
+    ▼
+Skin ViT classifies → "Melanoma" (with confidence score)
+    │
+    ▼
+"Melanoma" sent to Qwen 3 (Ollama)
+    │
+    ▼
+Qwen 3 generates DPT Report:
+    ├── 🔍 DIAGNOSIS: Melanoma — a malignant skin tumor...
+    ├── 📈 PROGNOSIS: Early-stage melanoma has a 5-year survival rate of...
+    └── 💊 THERAPY: Surgical excision is the primary treatment...
+```
+
+### Flow B: Text Input
+
+```
+User types: "I have tooth pain with dark spots on my molar"
+    │
+    ▼
+FastAPI receives text
+    │
+    ▼
+Text sent directly to Qwen 3 (Ollama)
+    │
+    ▼
+Qwen 3 generates DPT Report:
+    ├── 🔍 DIAGNOSIS: Likely dental caries (tooth decay)...
+    ├── 📈 PROGNOSIS: If untreated, may progress to pulpitis...
+    └── 💊 THERAPY: Dental filling, root canal if advanced...
+```
+
+### Flow C: Audio Input
+
+```
+User speaks symptoms into microphone
+    │
+    ▼
+FastAPI receives audio
+    │
+    ▼
+Speech-to-Text converts → "I have red itchy patches on my arms"
+    │
+    ▼
+Text sent directly to Qwen 3 (Ollama)
+    │
+    ▼
+Qwen 3 generates DPT Report
+```
+
+---
+
+## 6. Technology Stack
+
+| Component | Technology |
+|---|---|
+| **Image Router** | MobileNet V2 (PyTorch, pretrained) |
+| **Disease Classifiers** | Custom Vision Transformers with SPT + LSA (PyTorch) |
+| **Reasoning LLM** | Qwen 3 via Ollama (local deployment) |
+| **Speech-to-Text** | STT engine (converts audio to text) |
+| **Backend API** | FastAPI (Python) |
+| **Frontend UI** | Google Stitch |
+| **Training Platform** | Kaggle Notebooks / Google Colab (GPU) |
+| **Deep Learning** | PyTorch |
+
+---
+
+## 7. Model Summary
 
 | Model | Task | Classes | Accuracy | Params |
 |---|---|---|---|---|
@@ -168,83 +267,58 @@ The entire pipeline is orchestrated via a **FastAPI** server that:
 | Eye ViT | Eye disease classification | 4 | Moderate | ~21M |
 | Dental ViT | Dental disease classification | 6 | Moderate | ~21M |
 | Skin ViT | Skin disease classification | 10 | **67.55%** | ~21M |
-| Gemma 3 4B | DPT report generation | — | — | LLM |
+| Qwen 3 | DPT report generation | — | — | LLM |
 
 ---
 
-## 6. Setup
+## 8. Output — The DPT Report
 
-```bash
-pip install -r requirements.txt
+The final output is a structured clinical report with three sections:
 
-# Install and start Ollama, then pull the model
-ollama pull gemma3:4b
-ollama serve
+### 🔍 Diagnosis
+- Identified disease/condition name
+- Clinical description and characteristics
+- Key indicators and symptoms
+- Differential diagnoses to consider
 
-# Run the server
-python main.py
-```
+### 📈 Prognosis
+- Expected disease progression
+- Severity assessment
+- Risk factors and complications
+- Recovery timeline estimates
 
-### Training Your Own Models
-
-Trained `.pth` weights are not included. To train them:
-
-1. Download the datasets from Kaggle (links in section 4.1)
-2. Run the training scripts:
-```bash
-python mobilenet_router.py
-python vit_eye_disease.py
-python vit_skin_disease.py
-python vit_dental_disease.py
-```
-3. Place the resulting `.pth` files in a `Models/` directory
+### 💊 Therapy
+- Recommended treatment options
+- Medication suggestions
+- Lifestyle modifications
+- When to seek specialist care
+- Follow-up recommendations
 
 ---
 
-## 7. API Endpoints
+## 9. Project Files
 
-| Method | Endpoint | Input | Output |
-|---|---|---|---|
-| `GET` | `/health` | — | System status |
-| `GET` | `/models/status` | — | Loaded models info |
-| `POST` | `/analyze/image` | Image file | Routing + Disease + DPT Report |
-| `POST` | `/analyze/text` | Symptoms text | DPT Report |
-| `POST` | `/analyze/audio` | Audio file | Transcription + DPT Report |
-| `POST` | `/analyze/image/stream` | Image file | SSE streaming DPT Report |
+| File | Purpose |
+|---|---|
+| `vit_eye_disease.py` | Eye ViT training script |
+| `vit_dental_disease.py` | Dental ViT training script |
+| `vit_skin_disease.py` | Skin ViT training script |
+| `mobilenet_router.py` | MobileNet router training + custom dataset creation |
+| `mobilenet_inference_cell.py` | Inference/testing cell for the router |
+| `vit_eye_disease.pth` | Trained eye ViT weights |
+| `vit_dental_disease.pth` | Trained dental ViT weights |
+| `vit_skin_disease.pth` | Trained skin ViT weights |
+| `mobilenet_router.pth` | Trained MobileNet router weights |
 
 ---
 
-## 8. Project Structure
-```text
-DPT_Clinical_Decision_Support_Engine/
-├── app/
-│   ├── __init__.py
-│   ├── config.py
-│   ├── model_loader.py
-│   ├── pipeline.py
-│   ├── reasoning.py
-│   └── speech.py
-├── plots/
-├── main.py
-├── requirements.txt
-├── index.html
-├── technical_report.md
-├── vit_eye_disease.py
-├── vit_dental_disease.py
-├── vit_skin_disease.py
-├── mobilenet_router.py
-├── mobilenet_inference_cell.pyß
-├── evaluate_models.py
-└── .gitignore
-```
+## 10. Key Design Decisions
 
-## 9. Key Design Decisions
-
-1. **MobileNet V2 as router** — Lightweight (2.88M params), fast inference, and 99.92% accurate. Correctly identifies the image domain before expensive ViT inference runs.
+1. **MobileNet V2 as router** — Lightweight (2.88M params), fast inference, and 99.92% accurate. It correctly identifies the image domain before expensive ViT inference runs.
 
 2. **Custom ViTs instead of pretrained** — Built from scratch with Shifted Patch Tokenization and Locality Self-Attention for better performance on small medical datasets.
 
-3. **Ollama for reasoning** — Runs locally, no API costs, no data privacy concerns (critical for medical data).
+3. **Ollama for reasoning** — Runs locally, no API costs, no data privacy concerns (critical for medical data). Qwen 3 provides strong reasoning capabilities.
 
 4. **Three input modalities** — Covers the most common ways a patient might describe their condition: showing an image, typing symptoms, or speaking about them.
 
